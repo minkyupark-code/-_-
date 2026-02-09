@@ -1,0 +1,82 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>강원대 신호등</title>
+    <style>
+        body { font-family: sans-serif; text-align: center; background: #f0f0f0; padding: 20px; }
+        .light { width: 150px; height: 150px; border-radius: 50%; margin: 20px auto; border: 5px solid #333; transition: 0.3s; }
+        .green { background-color: #2ecc71; box-shadow: 0 0 30px #2ecc71; }
+        .red { background-color: #e74c3c; box-shadow: 0 0 30px #e74c3c; }
+        .timer { font-size: 3rem; font-weight: bold; margin: 10px 0; }
+        .settings { background: white; padding: 15px; border-radius: 10px; margin-top: 20px; }
+        input { width: 50px; padding: 5px; text-align: center; }
+        button { padding: 10px 20px; font-size: 1rem; cursor: pointer; border-radius: 5px; border: none; background: #34495e; color: white; margin-top: 10px; }
+    </style>
+</head>
+<body>
+
+    <h1>🚥 신호등 타이머</h1>
+    
+    <div id="lightCircle" class="light red"></div>
+    <div id="statusText" style="font-size: 1.5rem;">대기 중...</div>
+    <div id="timerDisplay" class="timer">00</div>
+
+    <button onclick="syncGreen()" style="background: #27ae60; font-weight: bold;">지금 초록불 시작! (동기화)</button>
+
+    <div class="settings">
+        <h3>설정 (초 단위)</h3>
+        초록불: <input type="number" id="greenTime" value="27"> 초<br>
+        빨간불: <input type="number" id="redTime" value="133"> 초
+    </div>
+
+    <script>
+        let startTime = null; // 초록불이 시작된 시점 (Timestamp)
+
+        function syncGreen() {
+            startTime = Date.now();
+            localStorage.setItem('trafficStartTime', startTime); // 브라우저에 저장
+            alert("동기화되었습니다!");
+        }
+
+        // 로컬스토리지에서 기존 시작 시간 불러오기
+        if(localStorage.getItem('trafficStartTime')) {
+            startTime = parseInt(localStorage.getItem('trafficStartTime'));
+        }
+
+        function update() {
+            if (!startTime) return;
+
+            const greenDuration = parseInt(document.getElementById('greenTime').value);
+            const redDuration = parseInt(document.getElementById('redTime').value);
+            const totalCycle = greenDuration + redDuration;
+
+            // 1. 현재 지난 시간 계산
+            const elapsed = Math.floor((Date.now() - startTime) / 1000);
+            
+            // 2. 모듈러 연산: 현재 사이클 내에서 몇 초 지났는지
+            const currentProgress = elapsed % totalCycle;
+
+            const lightCircle = document.getElementById('lightCircle');
+            const timerDisplay = document.getElementById('timerDisplay');
+            const statusText = document.getElementById('statusText');
+
+            if (currentProgress < greenDuration) {
+                // 초록불 상태
+                lightCircle.className = "light green";
+                statusText.innerText = "초록불 - 건너세요!";
+                timerDisplay.innerText = greenDuration - currentProgress;
+            } else {
+                // 빨간불 상태
+                lightCircle.className = "light red";
+                statusText.innerText = "빨간불 - 정지";
+                timerDisplay.innerText = totalCycle - currentProgress;
+            }
+        }
+
+        // 0.5초마다 업데이트 (부드럽게 표시)
+        setInterval(update, 500);
+    </script>
+</body>
+</html>
