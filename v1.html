@@ -3,25 +3,35 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>강원대 실시간 신호등</title>
+    <title>강원대 실시간 신호등 (깜빡임 알림)</title>
     <style>
-        body { font-family: 'Pretendard', sans-serif; text-align: center; background: #1a1a1a; color: white; padding: 20px; }
+        body { font-family: 'Pretendard', sans-serif; text-align: center; background: #1a1a1a; color: white; padding: 20px; transition: background 0.3s; }
+        
+        /* 깜빡임 애니메이션 정의 */
+        @keyframes flash-animation {
+            0% { background-color: #1a1a1a; }
+            50% { background-color: #3d3d3d; }
+            100% { background-color: #1a1a1a; }
+        }
+        .warning-flash { animation: flash-animation 0.5s infinite; }
+
         .clock { font-size: 1.5rem; color: #aaa; margin-bottom: 10px; }
-        .light { width: 180px; height: 180px; border-radius: 50%; margin: 20px auto; border: 8px solid #333; transition: 0.5s; }
+        .light { width: 180px; height: 180px; border-radius: 50%; margin: 20px auto; border: 8px solid #333; transition: 0.5s; position: relative; }
         .green { background-color: #2ecc71; box-shadow: 0 0 50px #2ecc71; }
         .red { background-color: #e74c3c; box-shadow: 0 0 50px #e74c3c; }
+        
         .timer-container { margin: 20px 0; }
         .status-msg { font-size: 1.8rem; font-weight: bold; min-height: 2.5rem; }
         .next-msg { font-size: 1.2rem; color: #f1c40f; margin-top: 10px; }
         .timer { font-size: 4rem; font-weight: 900; margin: 10px 0; }
+        
         .settings { background: #333; padding: 20px; border-radius: 15px; margin-top: 30px; font-size: 0.9rem; }
         input { width: 60px; padding: 5px; border-radius: 5px; border: none; text-align: center; }
         button { padding: 12px 24px; font-size: 1rem; cursor: pointer; border-radius: 8px; border: none; background: #34495e; color: white; transition: 0.2s; }
-        button:hover { background: #2c3e50; }
         .sync-btn { background: #27ae60; font-weight: bold; width: 100%; max-width: 300px; margin-bottom: 10px; }
     </style>
 </head>
-<body>
+<body id="mainBody">
 
     <div id="realTimeClock" class="clock">00:00:00</div>
     
@@ -33,67 +43,68 @@
         <div id="nextEventText" class="next-msg">신호등 상태를 확인 중...</div>
     </div>
 
-    <button onclick="syncGreen()" class="sync-btn">지금 초록불로 바뀌었음! (동기화)</button>
+    <button onclick="syncGreen()" class="sync-btn">지금 초록불 시작! (동기화)</button>
 
     <div class="settings">
         <h3 style="margin-top:0">⚙️ 신호 주기 설정</h3>
         초록불: <input type="number" id="greenTime" value="27"> 초 / 
         빨간불: <input type="number" id="redTime" value="133"> 초
-        <p style="color: #888; font-size: 0.8rem;">한 번만 맞춰두면 매일 이 시간에 맞춰 작동합니다.</p>
     </div>
 
     <script>
         let referenceTime = localStorage.getItem('trafficRefTime') ? parseInt(localStorage.getItem('trafficRefTime')) : null;
 
         function syncGreen() {
-            // 현재 시간을 '초록불 시작점'으로 저장
             referenceTime = Date.now();
             localStorage.setItem('trafficRefTime', referenceTime);
-            alert("현재 시각을 기준으로 동기화되었습니다.");
+            alert("동기화되었습니다!");
         }
 
         function update() {
             const now = new Date();
-            // 1. 실시간 시계 표시
             document.getElementById('realTimeClock').innerText = now.toLocaleTimeString();
 
             if (!referenceTime) return;
 
             const greenDuration = parseInt(document.getElementById('greenTime').value);
             const redDuration = parseInt(document.getElementById('redTime').value);
-            const totalCycle = (greenDuration + redDuration) * 1000; // 밀리초 단위
+            const totalCycle = (greenDuration + redDuration) * 1000;
 
-            // 2. 기준 시간으로부터 흐른 총 밀리초
             const elapsed = Date.now() - referenceTime;
-            
-            // 3. 현재 주기에서의 위치 (나머지 연산)
             const currentPos = elapsed % totalCycle;
 
+            const body = document.getElementById('mainBody');
             const lightCircle = document.getElementById('lightCircle');
             const timerDisplay = document.getElementById('timerDisplay');
             const statusText = document.getElementById('statusText');
             const nextEventText = document.getElementById('nextEventText');
 
-            if (currentPos < greenDuration * 1000) {
-                // --- 초록불 상태 ---
-                const remainingGreen = Math.ceil((greenDuration * 1000 - currentPos) / 1000);
+            let remainingSeconds;
+            let isGreen = currentPos < greenDuration * 1000;
+
+            if (isGreen) {
+                remainingSeconds = Math.ceil((greenDuration * 1000 - currentPos) / 1000);
                 lightCircle.className = "light green";
                 statusText.innerText = "지금은 초록불입니다";
                 statusText.style.color = "#2ecc71";
-                timerDisplay.innerText = remainingGreen;
-                nextEventText.innerText = `약 ${remainingGreen}초 후 빨간불로 바뀝니다.`;
             } else {
-                // --- 빨간불 상태 ---
-                const remainingRed = Math.ceil((totalCycle - currentPos) / 1000);
+                remainingSeconds = Math.ceil((totalCycle - currentPos) / 1000);
                 lightCircle.className = "light red";
                 statusText.innerText = "지금은 빨간불입니다";
                 statusText.style.color = "#e74c3c";
-                timerDisplay.innerText = remainingRed;
-                nextEventText.innerText = `약 ${remainingRed}초 후 초록불로 바뀝니다.`;
+            }
+
+            timerDisplay.innerText = remainingSeconds;
+            nextEventText.innerText = `약 ${remainingSeconds}초 후 신호 변경`;
+
+            // --- 5초 전 깜빡임 로직 ---
+            if (remainingSeconds <= 5) {
+                body.classList.add('warning-flash');
+            } else {
+                body.classList.remove('warning-flash');
             }
         }
 
-        // 0.2초마다 업데이트해서 시계와 타이머를 부드럽게 유지
         setInterval(update, 200);
     </script>
 </body>
