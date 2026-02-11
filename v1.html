@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>강원대 신호등</title>
+    <title>강원대 실시간 신호</title>
     <style>
         body { font-family: 'Pretendard', sans-serif; text-align: center; background: #1a1a1a; color: white; padding: 20px; transition: background 0.3s; }
         
@@ -15,7 +15,7 @@
         .warning-flash { animation: flash-animation 0.5s infinite; }
 
         .clock { font-size: 1.2rem; color: #aaa; margin-bottom: 10px; }
-        .light { width: 160px; height: 160px; border-radius: 50%; margin: 15px auto; border: 8px solid #333; transition: 0.5s; }
+        .light { width: 140px; height: 140px; border-radius: 50%; margin: 15px auto; border: 8px solid #333; transition: 0.5s; }
         .green { background-color: #2ecc71; box-shadow: 0 0 50px #2ecc71; }
         .red { background-color: #e74c3c; box-shadow: 0 0 50px #e74c3c; }
         
@@ -27,6 +27,12 @@
         .sync-btn { background: #27ae60; font-weight: bold; width: 100%; max-width: 320px; }
         .measure-btn { background: #8e44ad; width: 100%; max-width: 320px; font-weight: bold; }
         
+        /* 이동 시간 측정 전용 스타일 */
+        .travel-container { background: #2c3e50; padding: 15px; border-radius: 15px; margin: 20px auto; max-width: 320px; border: 2px solid #34495e; }
+        .travel-btn { background: #e67e22; width: 100%; font-weight: bold; font-size: 1.1rem; }
+        .travel-btn.running { background: #c0392b; }
+        .travel-time-display { font-size: 1.8rem; font-weight: bold; color: #f1c40f; margin-top: 5px; }
+
         .settings { background: #333; padding: 20px; border-radius: 15px; margin-top: 20px; font-size: 0.9rem; }
         input { width: 50px; padding: 5px; border-radius: 5px; border: none; text-align: center; background: #eee; }
         .guide { color: #f1c40f; font-size: 0.9rem; margin-top: 10px; font-weight: bold; }
@@ -35,6 +41,13 @@
 <body id="mainBody">
 
     <div id="realTimeClock" class="clock">00:00:00</div>
+    
+    <div class="travel-container">
+        <div style="font-size: 0.9rem; color: #bdc3c7;">🏠 집 → 🚦 신호등 측정</div>
+        <div id="travelDisplay" class="travel-time-display">00:00</div>
+        <button id="travelBtn" onclick="toggleTravelMeasure()" class="travel-btn">🏃 출발 (측정 시작)</button>
+    </div>
+
     <div id="lightCircle" class="light red"></div>
     
     <div class="timer-container">
@@ -42,7 +55,7 @@
         <div id="timerDisplay" class="timer">--</div>
     </div>
 
-    <button onclick="syncGreen()" class="sync-btn">지금 초록불 시작! (동기화)</button>
+    <button onclick="syncGreen()" class="sync-btn">지금 초록불 시작! </button>
     <br>
     <button id="measureBtn" onclick="handleMeasure()" class="measure-btn">📏 주기 측정 시작</button>
     <div id="measureGuide" class="guide">버튼을 눌러 측정을 시작하세요.</div>
@@ -56,12 +69,15 @@
     <script>
         let referenceTime = localStorage.getItem('trafficRefTime') ? parseInt(localStorage.getItem('trafficRefTime')) : null;
         
+        // 이동 시간 측정 상태
+        let travelStartTime = null;
+        let isTravelMeasuring = false;
+
         // 측정용 상태 변수
-        let measureStep = 0; // 0:대기, 1:초록불시작됨, 2:빨간불로바뀜
+        let measureStep = 0; 
         let t1, t2, t3;
 
         function saveSettings() {
-            // 값이 바뀌면 로직에 바로 반영되도록 함
             update();
         }
 
@@ -71,7 +87,28 @@
             alert("동기화 완료!");
         }
 
-        // 측정 로직 함수
+        // 이동 시간 측정 함수
+        function toggleTravelMeasure() {
+            const btn = document.getElementById('travelBtn');
+            const display = document.getElementById('travelDisplay');
+
+            if (!isTravelMeasuring) {
+                // 측정 시작
+                travelStartTime = Date.now();
+                isTravelMeasuring = true;
+                btn.innerText = "🏁 도착 (측정 종료)";
+                btn.classList.add('running');
+            } else {
+                // 측정 종료
+                isTravelMeasuring = false;
+                btn.innerText = "🏃 다시 측정하기";
+                btn.classList.remove('running');
+                
+                const finalTime = display.innerText;
+                alert(`신호등까지 총 ${finalTime} 걸렸습니다!`);
+            }
+        }
+
         function handleMeasure() {
             const btn = document.getElementById('measureBtn');
             const guide = document.getElementById('measureGuide');
@@ -79,29 +116,23 @@
             const rInput = document.getElementById('redTime');
 
             if (measureStep === 0) {
-                // 1단계: 초록불이 켜지는 순간 클릭
                 t1 = Date.now();
                 measureStep = 1;
                 btn.innerText = "🔴 빨간불로 바뀌면 클릭!";
                 guide.innerText = "초록불 유지 시간을 측정 중입니다...";
             } else if (measureStep === 1) {
-                // 2단계: 빨간불로 바뀌는 순간 클릭
                 t2 = Date.now();
                 const measuredGreen = Math.round((t2 - t1) / 1000);
-                gInput.value = measuredGreen; // 초록불 시간 자동 입력
+                gInput.value = measuredGreen;
                 measureStep = 2;
                 btn.innerText = "🟢 다시 초록불이 되면 클릭!";
                 guide.innerText = `확인된 초록불: ${measuredGreen}초. 이제 빨간불 측정 중...`;
             } else if (measureStep === 2) {
-                // 3단계: 다시 초록불이 켜지는 순간 클릭
                 t3 = Date.now();
                 const measuredRed = Math.round((t3 - t2) / 1000);
-                rInput.value = measuredRed; // 빨간불 시간 자동 입력
-                
-                // 측정 완료 시 자동으로 이 시간을 기준으로 동기화까지 수행
+                rInput.value = measuredRed;
                 referenceTime = t3;
                 localStorage.setItem('trafficRefTime', referenceTime);
-
                 measureStep = 0;
                 btn.innerText = "📏 주기 측정 시작";
                 guide.innerText = `측정 완료! 빨간불: ${measuredRed}초. 자동으로 동기화되었습니다.`;
@@ -110,8 +141,17 @@
         }
 
         function update() {
-            const now = new Date();
-            document.getElementById('realTimeClock').innerText = now.toLocaleTimeString();
+            const now = Date.now();
+            document.getElementById('realTimeClock').innerText = new Date(now).toLocaleTimeString();
+
+            // 이동 시간 실시간 업데이트
+            if (isTravelMeasuring && travelStartTime) {
+                const elapsedMs = now - travelStartTime;
+                const totalSeconds = Math.floor(elapsedMs / 1000);
+                const mins = String(Math.floor(totalSeconds / 60)).padStart(2, '0');
+                const secs = String(totalSeconds % 60).padStart(2, '0');
+                document.getElementById('travelDisplay').innerText = `${mins}:${secs}`;
+            }
 
             if (!referenceTime) return;
 
@@ -121,7 +161,7 @@
 
             if (totalCycle === 0) return;
 
-            const elapsed = Date.now() - referenceTime;
+            const elapsed = now - referenceTime;
             const currentPos = elapsed % totalCycle;
 
             const body = document.getElementById('mainBody');
@@ -146,7 +186,6 @@
 
             timerDisplay.innerText = remainingSeconds;
 
-            // 5초 전 깜빡임
             if (remainingSeconds <= 5) {
                 body.classList.add('warning-flash');
             } else {
